@@ -1,6 +1,6 @@
 """D3PG agent implementation."""
 import sys
-sys.path.append(r"/home/neardws/Documents/Game-Theoretic-Deep-Reinforcement-Learning/")
+sys.path.append(r"/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/")
 
 import copy
 import dataclasses

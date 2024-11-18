@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"/home/neardws/Documents/Game-Theoretic-Deep-Reinforcement-Learning/")
+sys.path.append(r"/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/")
 from environment_loop import EnvironmentLoop
 from absl.testing import absltest
 from Agents.MAD5PG import actors

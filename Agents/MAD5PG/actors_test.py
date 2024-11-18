@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"/home/neardws/Documents/Game-Theoretic-Deep-Reinforcement-Learning/")
+sys.path.append(r"/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/")
 from environment_loop import EnvironmentLoop
 from absl.testing import absltest
 from Agents.MAD5PG import actors
@@ -13,7 +13,7 @@ class ActorTest(absltest.TestCase):
 
     def test_feedforward(self):
 
-        environment_file_name = "/home/neardws/Documents/Game-Theoretic-Deep-Reinforcement-Learning/Data/2022-08-02-15-20-31/init_environment_9f109dd07f5c45c48802b6e3d80d274b.pkl"
+        environment_file_name = "/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/Data/2022-08-02-15-20-31/init_environment_9f109dd07f5c45c48802b6e3d80d274b.pkl"
     
         environment = load_obj(environment_file_name)
 

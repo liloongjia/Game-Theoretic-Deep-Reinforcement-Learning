@@ -1,3 +1,4 @@
+# 实用工具，包括车辆轨迹处理类和通信相关的函数
 import pandas as pd
 import numpy as np
 import time
@@ -34,17 +35,20 @@ class vehicleTrajectoriesProcessor(object):
         self._time_end = time_end
         self._out_file = out_file
         
-        self._edge_number = edge_number
-        
+        self._edge_number = edge_number # 9个
+        # 每一行或每一列上的边缘节点个数 3个
         self._edge_number_in_width = int(np.sqrt(self._edge_number))
         
+        # 用两个一维数组表示网格点 3x3=9
         longitudes = np.zeros(self._edge_number_in_width)
         latitudes = np.zeros(self._edge_number_in_width)
         longitudes[0] = self._longitude_min
         latitudes[0] = self._latitude_min
+        # 使用(0,0)处的坐标和两倍的通信范围计算(1,1)和(2,2)点的坐标
         for i in range(1, self._edge_number_in_width):
             longitudes[i], latitudes[i] = self.get_longitude_and_latitude_max(longitudes[i-1], latitudes[i-1], communication_range * 2)
         
+        # 生成9个csv文件
         for i in range(self._edge_number_in_width):
             for j in range(self._edge_number_in_width):
                 self.process(
@@ -54,10 +58,11 @@ class vehicleTrajectoriesProcessor(object):
                     out_file=self._out_file + '_' + str(i) + '_' + str(j) + '.csv'
                 )
 
+    # 使用最小经纬度点获得两倍通信范围的最大经纬度点，方形的对角两个点，注意是什么的坐标
     def get_longitude_and_latitude_max(self, longitude_min, latitude_min, map_width) -> tuple:
         longitude_max = longitude_min
         latitude_max = latitude_min
-        precision = 5 * 1e-1   
+        precision = 5 * 1e-1   # 精度
         """
         += 1e-2 add 1467 meters
         += 1e-3 add 147 meters
@@ -65,7 +70,8 @@ class vehicleTrajectoriesProcessor(object):
         += 1e-5 add 1 meter
         += 1e-6 add 0.25 meters
         """
-        length = np.sqrt(2) * map_width
+        length = np.sqrt(2) * map_width # 一个方格的对角线长度
+        # 逐渐逼近，不知道为什么没有直接计算
         while(True):
             distance = self.get_distance(longitude_min, latitude_min, longitude_max, latitude_max)
             if np.fabs(distance - length) < precision:
@@ -87,6 +93,7 @@ class vehicleTrajectoriesProcessor(object):
                 latitude_max += 1e-6
         return longitude_max, latitude_max
 
+    # 车辆轨迹处理类中的主要函数
     def process(self, communication_range, longitude_min, latitude_min, out_file) -> None:
 
         time_style = "%Y-%m-%d %H:%M:%S"
@@ -100,12 +107,13 @@ class vehicleTrajectoriesProcessor(object):
             names=['vehicle_id', 'order_number', 'time', 'longitude', 'latitude'], 
             header=0
         )
-        # 经纬度定位
+        # 经纬度定位 去掉第二列和包含缺失值的行
         df.drop(df.columns[[1]], axis=1, inplace=True)
         df.dropna(axis=0)
 
         longitude_max, latitude_max = self.get_longitude_and_latitude_max(longitude_min, latitude_min, communication_range * 2)
         
+        # 过滤方格范围内的数据，我觉得坐标系是不同的，不过转换后的值看起来差别很小
         df = df[
             (df['longitude'] > longitude_min) & 
             (df['longitude'] < longitude_max) & 
@@ -117,15 +125,16 @@ class vehicleTrajectoriesProcessor(object):
         # 排序
         df.sort_values(by=['vehicle_id', 'time'], inplace=True, ignore_index=True)
 
-        vehicle_number = 0
-        old_vehicle_id = None
-        for index, row in df.iterrows():
+        # 更新车辆数据 vehicle_id 转换为0-299 车辆坐标转换为相对距离
+        vehicle_number = 0 # 当前处理的车辆id
+        old_vehicle_id = None # 前一个车辆的id
+        for index, row in df.iterrows(): # 迭代器 索引和一行
 
             row = dict(df.iloc[index])
             vehicle_id = row['vehicle_id']
 
-            if old_vehicle_id:
-                if vehicle_id == old_vehicle_id:
+            if old_vehicle_id: # 不是第一行数据
+                if vehicle_id == old_vehicle_id: # 同一辆车
                     row['vehicle_id'] = vehicle_number
                     longitude, latitude = self.gcj02_to_wgs84(float(row['longitude']), float(row['latitude']))
                     row['time'] = row['time'] - time_start
@@ -134,8 +143,8 @@ class vehicleTrajectoriesProcessor(object):
                     row['longitude'] = x
                     row['latitude'] = y
                     df.iloc[index] = pd.Series(row)
-                else:
-                    vehicle_number += 1
+                else: # 新的车辆
+                    vehicle_number += 1 # 新的车辆，需要加一
                     row['vehicle_id'] = vehicle_number
                     longitude, latitude = self.gcj02_to_wgs84(float(row['longitude']), float(row['latitude']))
                     row['time'] = row['time'] - time_start
@@ -144,7 +153,7 @@ class vehicleTrajectoriesProcessor(object):
                     row['longitude'] = x
                     row['latitude'] = y
                     df.iloc[index] = pd.Series(row)
-            else:
+            else: # 第一行数据
                 row['vehicle_id'] = vehicle_number
                 longitude, latitude = self.gcj02_to_wgs84(float(row['longitude']), float(row['latitude']))
                 row['time'] = row['time'] - time_start
@@ -154,13 +163,14 @@ class vehicleTrajectoriesProcessor(object):
                 row['latitude'] = y
                 df.iloc[index] = pd.Series(row)
 
-            old_vehicle_id = vehicle_id
+            old_vehicle_id = vehicle_id # 更新旧的车辆id
 
+        # 补全数据 
         old_row = None
         for index, row in df.iterrows():
             new_row = dict(df.iloc[index])
-            if old_row:
-                if old_row['vehicle_id'] == new_row['vehicle_id']:
+            if old_row: # 非第一行
+                if old_row['vehicle_id'] == new_row['vehicle_id']: # 同一车辆
                     add_number = int(new_row['time']) - int(old_row['time']) - 1
                     if add_number > 0:
                         add_longitude = (float(new_row['longitude']) - float(old_row['longitude'])) / float(add_number)
@@ -173,8 +183,8 @@ class vehicleTrajectoriesProcessor(object):
                                     'latitude': [old_row['latitude'] + (time_index + 1) * add_latitude]})],
                                 axis=0,
                                 ignore_index=True)
-                else:
-                    if old_row['time'] < time_end - time_start:
+                else: # 不同车辆
+                    if old_row['time'] < time_end - time_start: # 补全旧车结尾
                         for time_index in range(time_end - time_start - int(old_row['time']) - 1):
                             df = pd.concat([df, pd.DataFrame({
                                     'vehicle_id': [old_row['vehicle_id']],
@@ -183,7 +193,7 @@ class vehicleTrajectoriesProcessor(object):
                                     'latitude': [old_row['latitude']]})],
                                 axis=0,
                                 ignore_index=True)
-                    if new_row['time'] > 0:
+                    if new_row['time'] > 0: # 补全新车开头
                         for time_index in range(int(new_row['time'])):
                             df = pd.concat([df, pd.DataFrame({
                                     'vehicle_id': [new_row['vehicle_id']],
@@ -193,7 +203,7 @@ class vehicleTrajectoriesProcessor(object):
                                 axis=0,
                                 ignore_index=True)
                 old_row = new_row
-            else:
+            else: # 第一行，补全开头
                 if new_row['time'] > 0:
                     for time_index in range(int(new_row['time'])):
                         df = pd.concat([df, pd.DataFrame({
@@ -203,7 +213,7 @@ class vehicleTrajectoriesProcessor(object):
                                 'latitude': [new_row['latitude']]})],
                             axis=0,
                             ignore_index=True)
-                old_row = new_row
+                old_row = new_row # 更新旧行为当前行
         df.sort_values(by=['vehicle_id', 'time'], inplace=True, ignore_index=True)
         df.to_csv(out_file)
 
@@ -256,6 +266,7 @@ class vehicleTrajectoriesProcessor(object):
                 np.sin(lng / 30.0 * np.pi)) * 2.0 / 3.0
         return ret
 
+    # 使用Haversine公式计算距离
     def get_distance(self, lng1: float, lat1: float, lng2: float, lat2: float) -> float:
         """ return the distance between two points in meters """
         lng1, lat1, lng2, lat2 = map(np.radians, [float(lng1), float(lat1), float(lng2), float(lat2)])
@@ -270,7 +281,7 @@ class vehicleTrajectoriesProcessor(object):
         return self._longitude_min
     
     def get_longitude_max(self) -> float:
-        return self._longitude_max
+        return self._longitude_max # 属性未定义
 
     def get_latitude_min(self) -> float:
         return self._latitude_min
@@ -278,15 +289,18 @@ class vehicleTrajectoriesProcessor(object):
     def get_latitude_max(self) -> float:
         return self._latitude_max
     
+# 通信相关的函数
+# 计算信道增益** 复数 绝对值平方后是一个小数
 def compute_channel_gain(
-    rayleigh_distributed_small_scale_fading: np.ndarray,
-    distance: float,
-    path_loss_exponent: int,
+    rayleigh_distributed_small_scale_fading: np.ndarray, # 瑞利分布的小尺度衰落
+    distance: float, # 距离
+    path_loss_exponent: int, # 路径损耗指数，通常取决于环境
 ) -> np.ndarray:
     return rayleigh_distributed_small_scale_fading / np.power(distance, path_loss_exponent / 2)
-    
+
+# 信道增益绝对值的平方 未使用    
 def compute_channel_condition(
-    channel_fading_gain: float,
+    channel_fading_gain: float, # 信道衰落增益
     distance: float,
     path_loss_exponent: int,
 ) -> float:
@@ -296,6 +310,7 @@ def compute_channel_condition(
     return np.power(np.abs(channel_fading_gain), 2) * \
         1.0 / (np.power(distance, path_loss_exponent))
 
+# 信号 干扰 噪声比
 def compute_SINR(
     white_gaussian_noise: int,
     channel_condition: float,
@@ -308,6 +323,7 @@ def compute_SINR(
     Args:
         white_gaussian_noise: the white gaussian noise of the channel, e.g., -70 dBm
         channel_fading_gain: the channel fading gain, e.g., Gaussion distribution with mean 2 and variance 0.4
+        信道条件应该是小数，信道增益的绝对值平方
         distance: the distance between the vehicle and the edge, e.g., 300 meters
         path_loss_exponent: the path loss exponent, e.g., 3
         transmission_power: the transmission power of the vehicle, e.g., 10 mW
@@ -333,9 +349,11 @@ def compute_SNR(
     return (1.0 / (cover_dBm_to_W(white_gaussian_noise) + intra_edge_interference)) * \
         channel_condition * cover_mW_to_W(transmission_power)
 
+# 传输延迟，边缘奖励
 def compute_edge_reward_with_SNR(SNR, bandwidth: float, data_size: float) -> float:
     return data_size / cover_MHz_to_Hz(bandwidth) * np.log2(1 + SNR)
 
+# 传输速率 香农公式
 def compute_transmission_rate(SINR, bandwidth) -> float:
     """
     :param SNR:
@@ -344,31 +362,37 @@ def compute_transmission_rate(SINR, bandwidth) -> float:
     """
     return float(cover_MHz_to_Hz(bandwidth) * np.log2(1 + SINR))
 
+# 信道衰落增益，从高斯（正态分布）中抽样，均值，方差，抽样个数
 def generate_channel_fading_gain(mean_channel_fading_gain, second_moment_channel_fading_gain, size: int = 1):
     channel_fading_gain = np.random.normal(loc=mean_channel_fading_gain, scale=second_moment_channel_fading_gain, size=size)
     return channel_fading_gain
 
+# 传输速率转换
 def cover_bps_to_Mbps(bps: float) -> float:
     return bps / 1000000
 
 def cover_Mbps_to_bps(Mbps: float) -> float:
     return Mbps * 1000000
 
+# 带宽转换
 def cover_MHz_to_Hz(MHz: float) -> float:
     return MHz * 1000000
 
+# 功率与分贝，分贝毫瓦与瓦
 def cover_ratio_to_dB(ratio: float) -> float:
     return 10 * np.log10(ratio)
 
 def cover_dB_to_ratio(dB: float) -> float:
     return np.power(10, (dB / 10))
 
+# 高斯白噪声 转换为功率
 def cover_dBm_to_W(dBm: float) -> float:
     return np.power(10, (dBm / 10)) / 1000
 
 def cover_W_to_dBm(W: float) -> float:
     return 10 * np.log10(W * 1000)
 
+# 功率转换
 def cover_W_to_mW(W: float) -> float:
     return W * 1000
 
@@ -376,6 +400,7 @@ def cover_mW_to_W(mW: float) -> float:
     return mW / 1000
 
 """Generate a random following the Complex normal distribution, which follows the normal distribution with mean 0 and variance 1"""
+# 生成复数正态分布的随机数，均值0 方差1 1j为虚数单位
 def generate_complex_normal_distribution(size: int = 1):
     return np.random.normal(loc=0, scale=1, size=size) + 1j * np.random.normal(loc=0, scale=1, size=size)
 

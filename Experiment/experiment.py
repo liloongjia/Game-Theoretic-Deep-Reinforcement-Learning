@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"/home/neardws/Documents/Game-Theoretic-Deep-Reinforcement-Learning/")
+sys.path.append(r"/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/")
 from absl import app
 import tensorflow as tf
 gpus = tf.config.experimental.list_physical_devices('GPU')
