@@ -1,14 +1,15 @@
-import launchpad as lp
-from Environment.environment import make_environment_spec
-from Agents.MADDPG.networks import make_default_networks
-from Agents.MADDPG.agent import DDPG
-from Agents.MADDPG.agent_distributed import DistributedDDPG
-from Utilities.FileOperator import load_obj
-from environment_loop import EnvironmentLoop
+import launchpad as lp # 用于启动和管理分布式系统
+from Environment.environment import make_environment_spec # 环境使用的值
+from Agents.MADDPG.networks import make_default_networks # 网络
+from Agents.MADDPG.agent import DDPG # 智能体
+from Agents.MADDPG.agent_distributed import DistributedDDPG # 分布式智能体
+from Utilities.FileOperator import load_obj # 加载环境对象
+from environment_loop import EnvironmentLoop # 环境循环**
 
+# 不同实验的main函数
 def main(_):
     
-    # different scenario
+    # different scenario 不同的场景
     # scneario 1
     # environment_file_name = "/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/Data/scenarios/scenario_1/convex_environment_b6447224a61e446183f13dd40a04b17b.pkl"
     # scneario 2
@@ -19,7 +20,7 @@ def main(_):
     # environment_file_name = "/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/Data/scenarios/scenario_4/convex_environment_1bc5da3127734abc9d015bccf84bc1c0.pkl"
     
     
-    # different compuation resources 
+    # different compuation resources 不同的计算资源
     # CPU 1-10GHz
     # environment_file_name = "/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/Data/computation/1GHz/convex_environment_b80ebdb0027045288b59f66247950cb0.pkl"
     # CPU 2-10GHz
@@ -29,7 +30,7 @@ def main(_):
     # CPU 5-10GHz
     # environment_file_name = "/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/Data/computation/5GHz/convex_environment_68eaeca4ef604e68b4753ad37530e431.pkl"
     
-    # different task number
+    # different task number 不同的任务数量 任务请求率
     # 0.3
     # environment_file_name = "/home/longjia/Projects/Game-Theoretic-Deep-Reinforcement-Learning/Data/task_number/0_3/convex_environment_590cd268b35a4e79b5b5216ee06e9ef3.pkl"
     # 0.4
@@ -41,30 +42,33 @@ def main(_):
     
     environment = load_obj(environment_file_name)
     
-    spec = make_environment_spec(environment)    
+    spec = make_environment_spec(environment) # 空间
     
+    # 网络
     networks = make_default_networks(
         agent_number=9,
         action_spec=spec.edge_actions,
     )
 
+    # 智能体
     agent = DDPG(
         agent_number=9,
         agent_action_size=27,
         environment_file=environment_file_name,
         environment_spec=spec,
         networks=networks,
-        batch_size=256,
-        prefetch_size=4,
-        min_replay_size=1000,
-        max_replay_size=1000000,
+        batch_size=256, # 批次大小
+        prefetch_size=4, # 预取大小
+        min_replay_size=1000, # 最小回放大小
+        max_replay_size=1000000, # 最大回放大小
         samples_per_insert=8.0,
         n_step=1,
-        sigma=0.3,
-        discount=0.996,
-        target_update_period=100,
+        sigma=0.3, # 
+        discount=0.996, # 折扣因子
+        target_update_period=100, # 目标网络更新周期
     )
 
+    # 创建循环，传递环境和智能体，执行迭代
     loop = EnvironmentLoop(environment, agent)
     loop.run(num_episodes=4100)
         
